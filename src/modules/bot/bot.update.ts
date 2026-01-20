@@ -102,6 +102,9 @@ export class BotUpdate {
 *Guruhlar:*
 /groups - Guruhlar ro'yxati
 /create_group - Yangi guruh yaratish
+
+*Statistika:*
+/stats - Umumiy statistika
       `;
       await ctx.reply(helpText, { parse_mode: 'Markdown' });
     } else {
@@ -350,6 +353,41 @@ export class BotUpdate {
     const session = this.getSession(ctx.from.id.toString());
     session.currentState = 'broadcast_message';
     await ctx.reply('📢 Yubormoqchi bo\'lgan xabarni kiriting:');
+  }
+
+  @Command('stats')
+  async statsCommand(@Ctx() ctx: Context) {
+    const user = await this.botService.findOrCreateUser(
+      ctx.from.id.toString(),
+      ctx.from,
+    );
+
+    if (user.role !== Role.TEACHER) {
+      await ctx.reply('❌ Sizda bu buyruqni bajarish uchun ruxsat yo\'q.');
+      return;
+    }
+
+    const groups = await this.groupsService.findAll();
+    let statsMessage = '📊 *Statistika:*\n\n';
+
+    for (const group of groups) {
+      const assignments = await this.assignmentsService.findAllByGroup(group.id);
+      const activeAssignments = assignments.filter((a) => new Date(a.dueDate) > new Date());
+      
+      let totalSubmissions = 0;
+      for (const assignment of assignments) {
+        const submissions = await this.assignmentsService.getSubmissionsByAssignment(assignment.id);
+        totalSubmissions += submissions.length;
+      }
+
+      statsMessage += `📚 *${group.name}:*\n`;
+      statsMessage += `   • Talabalar: ${group.students?.length || 0}\n`;
+      statsMessage += `   • Vazifalar: ${assignments.length}\n`;
+      statsMessage += `   • Aktiv vazifalar: ${activeAssignments.length}\n`;
+      statsMessage += `   • Topshirilgan javoblar: ${totalSubmissions}\n\n`;
+    }
+
+    await ctx.reply(statsMessage, { parse_mode: 'Markdown' });
   }
 
   // STUDENT COMMANDS
